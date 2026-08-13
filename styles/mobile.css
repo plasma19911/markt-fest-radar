@@ -1,0 +1,14 @@
+@media(max-width:800px){
+.mobile{display:inline-block}
+.topbar{height:60px;padding:0 10px}
+.topbar h1{font-size:17px}
+.layout{display:block}
+.content{padding:9px}
+.stats{grid-template-columns:repeat(3,1fr)}
+#status{grid-column:1/-1}
+#map{height:48vh;min-height:320px}
+.event-card{grid-template-columns:38px minmax(0,1fr)}
+.event-icon{width:38px;height:38px}
+.distance{grid-column:2}
+.drawer{width:94vw}
+}
