@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101722">
+  <meta name="description" content="Flohmärkte, Erntefeste, Stadtfeste und Märkte in Berlin und Brandenburg auf einer Karte.">
+  <title>Markt & Fest Radar Berlin-Brandenburg</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><small>BERLIN + BRANDENBURG</small><h1>Markt & Fest Radar</h1></div>
+    <div class="top-actions"><button id="historyBtn" type="button">★ Meine Besuche</button><button id="filterBtn" class="mobile" type="button">☰ Filter</button></div>
+  </header>
+
+  <main class="layout">
+    <aside id="filters" class="filters">
+      <label>Suche<input id="search" type="search" placeholder="Flohmarkt, Erntefest, Ort …"></label>
+      <section><b>Wann?</b><div class="chips" id="dateChips">
+        <button data-preset="today" class="active">Heute</button><button data-preset="tomorrow">Morgen</button><button data-preset="weekend">Wochenende</button><button data-preset="nextWeekend">Nächstes WE</button><button data-preset="all">Alle kommenden</button>
+      </div><label>Eigenes Datum<input id="date" type="date"></label><label>Ab Uhrzeit<input id="time" type="time"></label><label class="check"><input id="openNow" type="checkbox"> Nur jetzt geöffnet</label></section>
+      <section><b>Region</b><div class="chips" id="regionChips"><button data-region="all" class="active">Beide</button><button data-region="berlin">Berlin</button><button data-region="brandenburg">Brandenburg</button></div></section>
+      <section><b>Kategorien</b><div id="categories" class="category-grid"></div></section>
+      <section><b>Entfernung</b><button id="locate" class="secondary" type="button">📍 Mein Standort</button><select id="radius" disabled><option value="999">Beliebig weit</option><option value="10">max. 10 km</option><option value="25">max. 25 km</option><option value="50">max. 50 km</option><option value="100">max. 100 km</option></select><small id="locationState">Standort nicht gesetzt</small></section>
+      <section><label class="check"><input id="hideBad" type="checkbox" checked> 1–4/10 & „nicht nochmal“ ausblenden</label><label class="check"><input id="favorites" type="checkbox"> Nur Favoriten</label><label class="check"><input id="visited" type="checkbox"> Nur besucht</label></section>
+      <p class="source">Termine: Berlin Open Data (Berlin + Brandenburg, CC BY). Zusatzhinweise: Havelblick / SPD Oberhavel. Quellen werden höchstens einmal täglich aktualisiert.</p>
+    </aside>
+
+    <section class="content">
+      <div class="stats"><div><strong id="count">–</strong><span>Treffer</span></div><div><strong id="todayCount">–</strong><span>heute</span></div><div><strong id="visitedCount">0</strong><span>besucht</span></div><div id="status">Lade Termine …</div></div>
+      <div id="map"></div>
+      <div class="listHead"><div><h2>Passende Termine</h2><small id="subline"></small></div><select id="sort"><option value="date">Nach Datum</option><option value="distance">Nach Entfernung</option><option value="rating">Nach Bewertung</option></select></div>
+      <div id="events" class="event-list"></div>
+    </section>
+  </main>
+
+  <div id="backdrop" class="backdrop hidden"></div>
+  <aside id="drawer" class="drawer"><button id="closeDrawer" class="close">×</button><div id="detail"></div></aside>
+  <div id="historyBackdrop" class="backdrop hidden"></div>
+  <aside id="history" class="drawer"><button id="closeHistory" class="close">×</button><h2>Meine Besuche</h2><p class="muted">Bewertungen und Notizen bleiben auf diesem Gerät gespeichert.</p><div id="historyList" class="event-list"></div></aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>
