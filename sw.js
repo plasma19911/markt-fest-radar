@@ -1,4 +1,4 @@
-const CACHE='markt-fest-radar-v5';
+const CACHE='markt-fest-radar-v6';
 const SHELL=['/','/index.html','/styles.css','/styles/base.css','/styles/mobile.css','/styles/fixes.css','/styles/v5.css','/app.js','/data/seed-events.json','/manifest.webmanifest','/icons/icon.svg','/icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
