@@ -14,7 +14,7 @@
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -38,7 +38,6 @@
         <label>Eigenes Datum<input id="date" type="date"></label>
         <button id="locate" class="secondary" type="button">📍 Mein Standort</button>
         <label>Umkreis<select id="radius" disabled><option value="999">Beliebig</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label>
-        <label class="toggle"><input id="hideBad" type="checkbox" checked><span>Schlecht bewertete ausblenden</span></label>
         <label class="toggle"><input id="favorites" type="checkbox"><span>Nur Favoriten</span></label>
         <label class="toggle"><input id="visited" type="checkbox"><span>Nur besucht</span></label>
       </div>
@@ -52,14 +51,12 @@
       <div id="status">Lade Termine …</div>
     </section>
 
-    <section class="map-wrap">
-      <div id="map"></div>
-    </section>
+    <section class="map-wrap"><div id="map"></div></section>
 
     <section class="list-section">
       <div class="listHead">
-        <div><h2>Termine</h2><small id="subline">Alle Kategorien werden angezeigt.</small></div>
-        <select id="sort"><option value="date">Nach Datum</option><option value="distance">Nach Entfernung</option><option value="rating">Nach Bewertung</option></select>
+        <div><h2>Termine</h2><small id="subline">Alle Arten von Märkten und Festen werden angezeigt.</small></div>
+        <select id="sort"><option value="date">Nach Datum</option><option value="distance">Nach Entfernung</option></select>
       </div>
       <div id="events" class="event-list"></div>
     </section>
@@ -70,9 +67,9 @@
   <div id="backdrop" class="backdrop hidden"></div>
   <aside id="drawer" class="drawer"><button id="closeDrawer" class="close">×</button><div id="detail"></div></aside>
   <div id="historyBackdrop" class="backdrop hidden"></div>
-  <aside id="history" class="drawer"><button id="closeHistory" class="close">×</button><h2>Meine Besuche</h2><p class="muted">Bewertungen und Notizen bleiben auf diesem Gerät gespeichert.</p><div id="historyList" class="event-list"></div></aside>
+  <aside id="history" class="drawer"><button id="closeHistory" class="close">×</button><h2>Meine Besuche</h2><p class="muted">Besucht- und Favorit-Markierungen bleiben auf diesem Gerät gespeichert.</p><div id="historyList" class="event-list"></div></aside>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="/app.js?v=5" defer></script>
+  <script src="/app.js?v=6" defer></script>
 </body>
 </html>
