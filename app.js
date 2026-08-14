@@ -1,33 +1,336 @@
 (() => {
   'use strict';
-  const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-  const C={flea:{l:'Floh-/Trödelmarkt',i:'🧺',c:'#f6c85f'},harvest:{l:'Ernte & Hof',i:'🎃',c:'#e99043'},town:{l:'Stadt-/Dorffest',i:'🎉',c:'#7f8cff'},craft:{l:'Markt & Handwerk',i:'🛍️',c:'#d97adf'},christmas:{l:'Weihnachtsmarkt',i:'🎄',c:'#55c28d'},weekly:{l:'Wochenmarkt',i:'🥕',c:'#6bc5a4'},other:{l:'Weitere Feste',i:'🎪',c:'#73b8ef'}};
-  const berlin=new Set(['mitte','friedrichshain kreuzberg','pankow','charlottenburg wilmersdorf','spandau','steglitz zehlendorf','tempelhof schoneberg','neukolln','treptow kopenick','marzahn hellersdorf','lichtenberg','reinickendorf']);
-  const S={events:[],filtered:[],region:'all',preset:'today',cats:new Set(Object.keys(C)),loc:null,map:null,layer:null,markers:new Map()};
-  function parseDate(v){if(!v)return null;if(/^\d{4}-\d{2}-\d{2}/.test(v))return new Date(v.slice(0,10)+'T00:00:00');const m=String(v).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null}
-  function iso(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-  function start(d){const x=new Date(d);x.setHours(0,0,0,0);return x} function add(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
-  function cat(e){const t=norm([e.title,e.notes,e.sourceType,e.organizer].join(' '));if(/weihnacht|advent/.test(t))return'christmas';if(/floh|trodel|antikmarkt|sammel/.test(t))return'flea';if(/ernte|kurbis|bauern|hoffest|apfel|kartoffel/.test(t))return'harvest';if(/dorf fest|dorffest|stadtfest|volksfest|strassenfest|angerfest|heimatfest|flosserfest|hussitenfest/.test(t))return'town';if(/kunsthand|handwerk|kunstmarkt|basar/.test(t))return'craft';if(e.sourceType==='weekly')return'weekly';return'other'}
-  function region(e){const d=norm(e.district),p=norm(e.place);return berlin.has(d)||d==='berlin'||p==='berlin'?'berlin':'brandenburg'}
-  function key(e){return'eventpref:'+norm([e.title,e.address,e.zip,e.place].join('|')).slice(0,220)}
-  function pref(e){try{return JSON.parse(localStorage.getItem(key(e))||'{}')}catch{return{}}} function save(e,p){localStorage.setItem(key(e),JSON.stringify({...p,title:e.title,address:e.address,zip:e.zip,place:e.place,updatedAt:new Date().toISOString()}))}
-  function allPrefs(){const a=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith('eventpref:'))continue;try{const p=JSON.parse(localStorage.getItem(k));if(p.visited||p.rating||p.note||p.favorite||p.avoid)a.push(p)}catch{}}return a.sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))}
-  function hav(a,b){const R=6371,r=x=>x*Math.PI/180,d1=r(b[0]-a[0]),d2=r(b[1]-a[1]),q=Math.sin(d1/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(d2/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
-  function dist(e){return S.loc&&Number.isFinite(e.lat)&&Number.isFinite(e.lon)?hav(S.loc,[e.lat,e.lon]):null}
-  function dateRange(){if($('date').value){const d=new Date($('date').value+'T00:00:00');return[d,d]}const n=start(new Date());if(S.preset==='today')return[n,n];if(S.preset==='tomorrow')return[add(n,1),add(n,1)];if(S.preset==='weekend'||S.preset==='nextWeekend'){let x=(6-n.getDay()+7)%7;if(S.preset==='nextWeekend')x+=x===0?7:7;const sa=add(n,x),su=add(sa,1);return[sa,su]}return null}
-  function occurs(e,a,b){const f=parseDate(e.from),t=parseDate(e.to)||f;if(!a)return !t||t>=start(new Date());if(!f)return true;return start(t||f)>=start(a)&&start(f)<=start(b)}
-  function passesTime(e){if(!$('time').value&&!$('openNow').checked)return true;const txt=String(e.timeText||'');const ms=[...txt.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(?:-|bis)\s*(\d{1,2})(?::(\d{2}))?/gi)];if(!ms.length)return true;const m=ms[0],from=+m[1]*60+(+m[2]||0),to=+m[3]*60+(+m[4]||0);if($('openNow').checked){const n=new Date(),v=n.getHours()*60+n.getMinutes();return v>=from&&v<=to}const [h,mi]=$('time').value.split(':').map(Number);return to>=h*60+mi}
-  function doFilter(){const q=norm($('search').value),r=dateRange(),rad=+$('radius').value;S.filtered=S.events.filter(e=>{const p=pref(e),d=dist(e);if(!S.cats.has(e.category))return false;if(S.region!=='all'&&e.region!==S.region)return false;if(q&&!norm([e.title,e.place,e.address,e.district,e.notes].join(' ')).includes(q))return false;if(r&&!occurs(e,r[0],r[1]))return false;if(!passesTime(e))return false;if(S.loc&&rad<999&&d!=null&&d>rad)return false;if($('hideBad').checked&&(p.avoid||(+p.rating>0&&+p.rating<=4)))return false;if($('favorites').checked&&!p.favorite)return false;if($('visited').checked&&!p.visited)return false;return true});const sort=$('sort').value;S.filtered.sort((a,b)=>sort==='distance'?(dist(a)??1e9)-(dist(b)??1e9):sort==='rating'?(+pref(b).rating||0)-(+pref(a).rating||0):(parseDate(a.from)?.getTime()||9e15)-(parseDate(b.from)?.getTime()||9e15));render()}
-  function fmt(e){const f=parseDate(e.from),t=parseDate(e.to);if(!f)return'laufend';const opt={weekday:'short',day:'2-digit',month:'2-digit'};return t&&iso(t)!==iso(f)?`${f.toLocaleDateString('de-DE',opt)} – ${t.toLocaleDateString('de-DE',opt)}`:f.toLocaleDateString('de-DE',opt)}
-  function card(e){const p=pref(e),d=dist(e),c=C[e.category];const el=document.createElement('article');el.className='event-card';el.innerHTML=`<div class="event-icon">${c.i}</div><div><div class="event-title">${esc(e.title)}</div><div class="event-meta">${esc(fmt(e))}${e.timeText?' · '+esc(e.timeText):''}<br>${esc([e.address,e.zip,e.place].filter(Boolean).join(', '))}</div><div class="badges">${p.visited?'<span class="badge good">✓ besucht</span>':''}${p.rating?`<span class="badge ${+p.rating<=4?'bad':'good'}">${esc(p.rating)}/10</span>`:''}${p.favorite?'<span class="badge good">★ Favorit</span>':''}${p.avoid?'<span class="badge bad">nicht nochmal</span>':''}${e.sourceType==='havelblick'?'<span class="badge">Havelblick</span>':''}</div></div><div class="distance">${d==null?'':d.toFixed(1)+' km'}</div>`;el.addEventListener('click',()=>detail(e));return el}
-  function render(){const host=$('events');host.innerHTML='';S.filtered.forEach(e=>host.append(card(e)));if(!S.filtered.length)host.innerHTML='<div class="empty">Keine passenden Termine. Ändere Datum, Kategorie oder Region.</div>';$('count').textContent=S.filtered.length;$('todayCount').textContent=S.events.filter(e=>occurs(e,start(new Date()),start(new Date()))).length;$('visitedCount').textContent=allPrefs().filter(x=>x.visited).length;$('subline').textContent=S.filtered.length?'Karte und Liste sind synchronisiert.':'';renderMap()}
-  function renderMap(){S.layer.clearLayers();S.markers.clear();for(const e of S.filtered){if(!Number.isFinite(e.lat)||!Number.isFinite(e.lon))continue;const c=C[e.category];const icon=L.divIcon({className:'',html:`<div class="pin" style="--cat:${c.c}"><span>${c.i}</span></div>`,iconSize:[28,28],iconAnchor:[14,28]});const m=L.marker([e.lat,e.lon],{icon}).addTo(S.layer).bindTooltip(`${e.title} · ${fmt(e)}`);m.on('click',()=>detail(e));S.markers.set(e.id,m)}}
-  function open(id,bg){$(id).classList.add('open');$(bg).classList.remove('hidden')} function close(id,bg){$(id).classList.remove('open');$(bg).classList.add('hidden')}
-  function detail(e){const p=pref(e),c=C[e.category],nav=`https://www.openstreetmap.org/directions?to=${encodeURIComponent(e.lat+','+e.lon)}`;$('detail').innerHTML=`<div class="detail-kicker">${c.i} ${esc(c.l)}</div><h2>${esc(e.title)}</h2><dl class="detail-grid"><dt>Datum</dt><dd>${esc(fmt(e))}</dd><dt>Uhrzeit</dt><dd>${esc(e.timeText||'nicht angegeben')}</dd><dt>Ort</dt><dd>${esc([e.address,e.zip,e.place].filter(Boolean).join(', '))}</dd><dt>Quelle</dt><dd>${esc(e.sourceLabel||'Open Data')}</dd></dl><div class="actions">${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener">Quelle öffnen</a>`:'<span></span>'}${Number.isFinite(e.lat)?`<a href="${nav}" target="_blank" rel="noopener">Route</a>`:''}</div><section class="personal"><h3>Meine Erinnerung</h3><label class="check"><input id="dVisited" type="checkbox" ${p.visited?'checked':''}> Ich war hier</label><label class="check"><input id="dFavorite" type="checkbox" ${p.favorite?'checked':''}> Favorit / wieder hin</label><label>Bewertung 1–10<input id="dRating" type="range" min="0" max="10" value="${+p.rating||0}"><span id="ratingValue" class="ratingValue">${p.rating?p.rating+'/10':'–'}</span></label><label>Notiz<textarea id="dNote" placeholder="z. B. wenig Stände, Parken schlecht, Essen super …">${esc(p.note||'')}</textarea></label><label class="check"><input id="dAvoid" type="checkbox" ${p.avoid?'checked':''}> Nicht nochmal empfehlen</label><button id="savePref" class="save">Speichern</button></section>`;$('dRating').addEventListener('input',ev=>$('ratingValue').textContent=+ev.target.value?ev.target.value+'/10':'–');$('savePref').addEventListener('click',()=>{save(e,{visited:$('dVisited').checked,favorite:$('dFavorite').checked,rating:+$('dRating').value||0,note:$('dNote').value.trim(),avoid:$('dAvoid').checked,lastVisited:$('dVisited').checked?(p.lastVisited||iso(new Date())):''});doFilter();detail(e)});open('drawer','backdrop');const m=S.markers.get(e.id);if(m)S.map.panTo(m.getLatLng())}
-  function history(){const h=$('historyList');h.innerHTML='';for(const p of allPrefs()){const d=document.createElement('div');d.className='event-card';d.style.gridTemplateColumns='1fr';d.innerHTML=`<div><div class="event-title">${esc(p.title||'Veranstaltung')}</div><div class="event-meta">${esc([p.address,p.zip,p.place].filter(Boolean).join(', '))}</div><div class="badges">${p.visited?'<span class="badge good">✓ besucht</span>':''}${p.rating?`<span class="badge">${p.rating}/10</span>`:''}${p.favorite?'<span class="badge good">★ Favorit</span>':''}${p.avoid?'<span class="badge bad">nicht nochmal</span>':''}</div>${p.note?`<p>${esc(p.note)}</p>`:''}</div>`;h.append(d)}if(!h.children.length)h.innerHTML='<div class="empty">Noch keine Besuche gespeichert.</div>';open('history','historyBackdrop')}
-  function initMap(){S.map=L.map('map').setView([52.4,13.1],8);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap-Mitwirkende'}).addTo(S.map);S.layer=L.layerGroup().addTo(S.map)}
-  function setup(){const cats=$('categories');Object.entries(C).forEach(([k,v])=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" checked data-cat="${k}"> ${v.i} ${esc(v.l)}`;l.querySelector('input').addEventListener('change',ev=>{ev.target.checked?S.cats.add(k):S.cats.delete(k);doFilter()});cats.append(l)});document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{S.preset=b.dataset.preset;$('date').value='';document.querySelectorAll('[data-preset]').forEach(x=>x.classList.toggle('active',x===b));doFilter()}));document.querySelectorAll('[data-region]').forEach(b=>b.addEventListener('click',()=>{S.region=b.dataset.region;document.querySelectorAll('[data-region]').forEach(x=>x.classList.toggle('active',x===b));doFilter()}));['search','date','time','openNow','hideBad','favorites','visited','radius','sort'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',doFilter));$('locate').addEventListener('click',()=>navigator.geolocation?.getCurrentPosition(p=>{S.loc=[p.coords.latitude,p.coords.longitude];$('radius').disabled=false;$('locationState').textContent='Standort aktiv';doFilter()},()=>{$('locationState').textContent='Standort nicht freigegeben'}));$('filterBtn').addEventListener('click',()=>$('filters').classList.toggle('open'));$('historyBtn').addEventListener('click',history);$('closeDrawer').addEventListener('click',()=>close('drawer','backdrop'));$('backdrop').addEventListener('click',()=>close('drawer','backdrop'));$('closeHistory').addEventListener('click',()=>close('history','historyBackdrop'));$('historyBackdrop').addEventListener('click',()=>close('history','historyBackdrop'))}
-  async function load(){try{const r=await fetch('/api/events');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();S.events=(data.events||[]).map((e,i)=>{const x={...e,id:String(e.id||'e'+i)};x.category=cat(x);x.region=region(x);return x});$('status').textContent=`${S.events.length} Termine · täglich aktualisiert`;doFilter()}catch(e){console.error(e);$('status').textContent='Daten konnten nicht geladen werden';$('events').innerHTML='<div class="empty">Die Terminquelle ist gerade nicht erreichbar.</div>'}}
-  initMap();setup();load();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+  const $ = id => document.getElementById(id);
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const norm = value => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const TODAY = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+
+  const TYPES = {
+    flea: { label: 'Floh-/Trödelmarkt', icon: '🧺', color: '#f6c85f' },
+    harvest: { label: 'Ernte-/Hoffest', icon: '🎃', color: '#e99043' },
+    festival: { label: 'Dorf-/Stadtfest', icon: '🎉', color: '#7f8cff' },
+    christmas: { label: 'Weihnachtsmarkt', icon: '🎄', color: '#55c28d' },
+    market: { label: 'Markt', icon: '🛍️', color: '#d97adf' },
+    other: { label: 'Veranstaltung', icon: '🎪', color: '#73b8ef' }
+  };
+
+  const S = { events: [], filtered: [], preset: 'all', loc: null, map: null, layer: null, markers: new Map(), fitted: false };
+
+  function parseDate(value) {
+    if (!value) return null;
+    const raw = String(value).trim();
+    let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = raw.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+  }
+
+  function iso(date) {
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  }
+
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function classify(event) {
+    const text = norm([event.title, event.notes, event.scheduleText, event.sourceType].join(' '));
+    if (/weihnacht|advent/.test(text)) return 'christmas';
+    if (/floh|trodel|antik|sammler|trödel/.test(text)) return 'flea';
+    if (/ernte|hoffest|kurbis|bauern|landpartie|kartoffel|apfel/.test(text)) return 'harvest';
+    if (/dorf|stadtfest|straßenfest|strassenfest|volksfest|fest|festival|kietzer|hafenfest/.test(text)) return 'festival';
+    if (/markt|handwerk|basar/.test(text)) return 'market';
+    return 'other';
+  }
+
+  function stableKey(event) {
+    const base = event.groupId || [event.title, event.address, event.zip, event.place].join('|');
+    return `eventpref:${norm(base).slice(0,220)}`;
+  }
+
+  function pref(event) {
+    try { return JSON.parse(localStorage.getItem(stableKey(event)) || '{}'); }
+    catch { return {}; }
+  }
+
+  function savePref(event, value) {
+    localStorage.setItem(stableKey(event), JSON.stringify({ ...value, groupId: event.groupId || '', title: event.title, address: event.address, zip: event.zip, place: event.place, updatedAt: new Date().toISOString() }));
+  }
+
+  function allPrefs() {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith('eventpref:')) continue;
+      try {
+        const value = JSON.parse(localStorage.getItem(key));
+        if (value.visited || value.favorite || value.rating || value.note || value.avoid) out.push(value);
+      } catch {}
+    }
+    return out.sort((a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  }
+
+  function distanceKm(a, b) {
+    const rad = x => x * Math.PI / 180;
+    const R = 6371;
+    const dLat = rad(b[0] - a[0]);
+    const dLon = rad(b[1] - a[1]);
+    const q = Math.sin(dLat/2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLon/2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(q));
+  }
+
+  function eventDistance(event) {
+    return S.loc && Number.isFinite(event.lat) && Number.isFinite(event.lon) ? distanceKm(S.loc, [event.lat, event.lon]) : null;
+  }
+
+  function dateRange() {
+    const chosen = $('date').value;
+    if (chosen) {
+      const d = new Date(`${chosen}T00:00:00`);
+      return [d, d];
+    }
+    const now = TODAY();
+    if (S.preset === 'today') return [now, now];
+    if (S.preset === 'tomorrow') return [addDays(now, 1), addDays(now, 1)];
+    if (S.preset === 'weekend' || S.preset === 'nextWeekend') {
+      let offset = (6 - now.getDay() + 7) % 7;
+      if (S.preset === 'nextWeekend') offset += 7;
+      const sat = addDays(now, offset);
+      return [sat, addDays(sat, 1)];
+    }
+    return null;
+  }
+
+  function isUpcoming(event) {
+    const from = parseDate(event.from);
+    const to = parseDate(event.to) || from;
+    if (!from && !to) return true;
+    return (to || from) >= TODAY();
+  }
+
+  function occursInRange(event, range) {
+    if (!range) return isUpcoming(event);
+    const from = parseDate(event.from);
+    const to = parseDate(event.to) || from;
+    if (!from) return false;
+    return to >= range[0] && from <= range[1];
+  }
+
+  function formatDate(event) {
+    const from = parseDate(event.from);
+    const to = parseDate(event.to);
+    if (!from) return event.scheduleText || 'regelmäßig';
+    const opts = { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' };
+    if (to && iso(to) !== iso(from)) return `${from.toLocaleDateString('de-DE', opts)} – ${to.toLocaleDateString('de-DE', opts)}`;
+    return from.toLocaleDateString('de-DE', opts);
+  }
+
+  function normalizeEvent(event, index) {
+    const lat = Number(event.lat);
+    const lon = Number(event.lon ?? event.lng);
+    const normalized = { ...event, id: String(event.id || `event-${index}`), title: String(event.title || event.bezeichnung || 'Veranstaltung'), address: String(event.address || event.strasse || ''), zip: String(event.zip || event.plz || ''), place: String(event.place || event.ort || event.district || ''), from: String(event.from || event.von || ''), to: String(event.to || event.bis || ''), timeText: String(event.timeText || event.zeiten || event.zeit || ''), notes: String(event.notes || event.bemerkungen || ''), sourceLabel: String(event.sourceLabel || 'Quelle'), lat: Number.isFinite(lat) ? lat : null, lon: Number.isFinite(lon) ? lon : null };
+    normalized.type = classify(normalized);
+    return normalized;
+  }
+
+  function dedupe(events) {
+    const seen = new Set();
+    const out = [];
+    for (const event of events) {
+      const key = norm([event.title, event.address, event.zip, event.place, event.from].join('|'));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(event);
+    }
+    return out;
+  }
+
+  function doFilter() {
+    const query = norm($('search').value);
+    const range = dateRange();
+    const radius = Number($('radius').value || 999);
+    S.filtered = S.events.filter(event => {
+      const p = pref(event);
+      if (!occursInRange(event, range)) return false;
+      if (query && !norm([event.title, event.place, event.address, event.notes, event.sourceLabel].join(' ')).includes(query)) return false;
+      const dist = eventDistance(event);
+      if (S.loc && radius < 999 && dist != null && dist > radius) return false;
+      if ($('hideBad').checked && (p.avoid || (+p.rating > 0 && +p.rating <= 4))) return false;
+      if ($('favorites').checked && !p.favorite) return false;
+      if ($('visited').checked && !p.visited) return false;
+      return true;
+    });
+    const sort = $('sort').value;
+    S.filtered.sort((a,b) => {
+      if (sort === 'distance') return (eventDistance(a) ?? 1e9) - (eventDistance(b) ?? 1e9);
+      if (sort === 'rating') return (+pref(b).rating || 0) - (+pref(a).rating || 0);
+      return (parseDate(a.from)?.getTime() ?? 9e15) - (parseDate(b.from)?.getTime() ?? 9e15);
+    });
+    render();
+  }
+
+  function eventCard(event) {
+    const type = TYPES[event.type] || TYPES.other;
+    const p = pref(event);
+    const dist = eventDistance(event);
+    const article = document.createElement('article');
+    article.className = 'event-card';
+    article.innerHTML = `<div class="event-icon">${type.icon}</div><div class="event-main"><div class="event-title">${esc(event.title)}</div><div class="event-meta"><b>${esc(formatDate(event))}</b>${event.timeText ? ` · ${esc(event.timeText)}` : ''}</div><div class="event-meta">📍 ${esc([event.address, event.zip, event.place].filter(Boolean).join(', ') || 'Ort siehe Quelle')}</div><div class="badges"><span class="badge">${esc(type.label)}</span>${event.groupId ? '<span class="badge">wiederkehrend</span>' : ''}${p.visited ? '<span class="badge good">✓ besucht</span>' : ''}${p.rating ? `<span class="badge ${+p.rating <= 4 ? 'bad' : 'good'}">${esc(p.rating)}/10</span>` : ''}${p.favorite ? '<span class="badge good">★ Favorit</span>' : ''}${p.avoid ? '<span class="badge bad">nicht nochmal</span>' : ''}</div></div><div class="distance">${dist == null ? '' : `${dist.toFixed(1)} km`}</div>`;
+    article.addEventListener('click', () => openDetail(event));
+    return article;
+  }
+
+  function render() {
+    const host = $('events');
+    host.innerHTML = '';
+    S.filtered.forEach(event => host.appendChild(eventCard(event)));
+    if (!S.filtered.length) host.innerHTML = '<div class="empty">Keine Termine für diesen Filter. „Alle kommenden“ zeigt wieder alles.</div>';
+    $('count').textContent = S.filtered.length;
+    const today = TODAY();
+    $('todayCount').textContent = S.events.filter(event => occursInRange(event, [today, today])).length;
+    $('visitedCount').textContent = allPrefs().filter(item => item.visited).length;
+    $('subline').textContent = `${S.filtered.length} Termine · alle Arten von Märkten und Festen`;
+    renderMap();
+  }
+
+  function markerGroups() {
+    const groups = new Map();
+    for (const event of S.filtered) {
+      if (!Number.isFinite(event.lat) || !Number.isFinite(event.lon)) continue;
+      const key = event.groupId || `${event.lat.toFixed(4)}|${event.lon.toFixed(4)}|${norm(event.title)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(event);
+    }
+    return groups;
+  }
+
+  function renderMap() {
+    if (!S.map || !S.layer || typeof L === 'undefined') return;
+    S.layer.clearLayers();
+    S.markers.clear();
+    const bounds = [];
+    for (const [groupKey, events] of markerGroups()) {
+      events.sort((a,b) => (parseDate(a.from)?.getTime() ?? 9e15) - (parseDate(b.from)?.getTime() ?? 9e15));
+      const event = events[0];
+      const type = TYPES[event.type] || TYPES.other;
+      const count = events.length;
+      const icon = L.divIcon({ className: '', html: `<div class="pin" style="--cat:${type.color}"><span>${type.icon}</span>${count > 1 ? `<b>${count}</b>` : ''}</div>`, iconSize: [34,38], iconAnchor: [17,36] });
+      const marker = L.marker([event.lat,event.lon], { icon }).addTo(S.layer);
+      marker.bindTooltip(`${event.title} · ${formatDate(event)}${count > 1 ? ` · ${count} Termine` : ''}`);
+      marker.on('click', () => openDetail(event));
+      S.markers.set(groupKey, marker);
+      bounds.push([event.lat,event.lon]);
+    }
+    if (!S.fitted && bounds.length) {
+      S.fitted = true;
+      if (bounds.length === 1) S.map.setView(bounds[0], 11, { animate: false });
+      else S.map.fitBounds(bounds, { padding: [25,25], maxZoom: 10, animate: false });
+    }
+  }
+
+  function openDrawer(id, backdrop) { $(id).classList.add('open'); $(backdrop).classList.remove('hidden'); }
+  function closeDrawer(id, backdrop) { $(id).classList.remove('open'); $(backdrop).classList.add('hidden'); }
+
+  function openDetail(event) {
+    const type = TYPES[event.type] || TYPES.other;
+    const p = pref(event);
+    const locationText = [event.address,event.zip,event.place].filter(Boolean).join(', ');
+    const routeUrl = Number.isFinite(event.lat) && Number.isFinite(event.lon) ? `https://www.openstreetmap.org/directions?to=${encodeURIComponent(`${event.lat},${event.lon}`)}` : '';
+    $('detail').innerHTML = `<div class="detail-kicker">${type.icon} ${esc(type.label)}</div><h2>${esc(event.title)}</h2><dl class="detail-grid"><dt>Datum</dt><dd>${esc(formatDate(event))}</dd><dt>Uhrzeit</dt><dd>${esc(event.timeText || 'siehe Quelle')}</dd><dt>Ort</dt><dd>${esc(locationText || 'siehe Quelle')}</dd><dt>Quelle</dt><dd>${esc(event.sourceLabel || 'Quelle')}</dd></dl>${event.notes ? `<p class="detail-note">${esc(event.notes)}</p>` : ''}<div class="actions">${event.url ? `<a href="${esc(event.url)}" target="_blank" rel="noopener">Quelle öffnen</a>` : '<span></span>'}${routeUrl ? `<a href="${routeUrl}" target="_blank" rel="noopener">Route öffnen</a>` : ''}</div><section class="personal"><h3>Meine Erinnerung</h3><label class="check"><input id="dVisited" type="checkbox" ${p.visited ? 'checked' : ''}> Ich war hier</label><label class="check"><input id="dFavorite" type="checkbox" ${p.favorite ? 'checked' : ''}> Favorit / wieder hin</label><label>Bewertung 1–10<input id="dRating" type="range" min="0" max="10" value="${+p.rating || 0}"><span id="ratingValue" class="ratingValue">${p.rating ? `${p.rating}/10` : '–'}</span></label><label>Notiz<textarea id="dNote" placeholder="z. B. wenig Stände, Parken schlecht, Essen super …">${esc(p.note || '')}</textarea></label><label class="check"><input id="dAvoid" type="checkbox" ${p.avoid ? 'checked' : ''}> Nicht nochmal empfehlen</label><button id="savePref" class="save" type="button">Speichern</button></section>`;
+    $('dRating').addEventListener('input', e => $('ratingValue').textContent = +e.target.value ? `${e.target.value}/10` : '–');
+    $('savePref').addEventListener('click', () => {
+      savePref(event, { visited: $('dVisited').checked, favorite: $('dFavorite').checked, rating: +$('dRating').value || 0, note: $('dNote').value.trim(), avoid: $('dAvoid').checked, lastVisited: $('dVisited').checked ? (p.lastVisited || iso(new Date())) : '' });
+      doFilter();
+      openDetail(event);
+    });
+    openDrawer('drawer','backdrop');
+  }
+
+  function showHistory() {
+    const host = $('historyList');
+    host.innerHTML = '';
+    for (const item of allPrefs()) {
+      const card = document.createElement('article');
+      card.className = 'event-card history-card';
+      card.innerHTML = `<div class="event-main"><div class="event-title">${esc(item.title || 'Veranstaltung')}</div><div class="event-meta">${esc([item.address,item.zip,item.place].filter(Boolean).join(', '))}</div><div class="badges">${item.visited ? '<span class="badge good">✓ besucht</span>' : ''}${item.rating ? `<span class="badge">${esc(item.rating)}/10</span>` : ''}${item.favorite ? '<span class="badge good">★ Favorit</span>' : ''}${item.avoid ? '<span class="badge bad">nicht nochmal</span>' : ''}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}</div>`;
+      host.appendChild(card);
+    }
+    if (!host.children.length) host.innerHTML = '<div class="empty">Noch keine Besuche gespeichert.</div>';
+    openDrawer('history','historyBackdrop');
+  }
+
+  function initMap() {
+    if (typeof L === 'undefined') {
+      $('map').innerHTML = '<div class="map-error">Karte konnte nicht geladen werden. Die Terminliste funktioniert trotzdem.</div>';
+      return;
+    }
+    S.map = L.map('map', { zoomControl: true }).setView([52.43,13.05], 8);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap-Mitwirkende' }).addTo(S.map);
+    S.layer = L.layerGroup().addTo(S.map);
+  }
+
+  function setup() {
+    document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+      S.preset = button.dataset.preset;
+      $('date').value = '';
+      document.querySelectorAll('[data-preset]').forEach(x => x.classList.toggle('active', x === button));
+      doFilter();
+    }));
+    $('search').addEventListener('input', doFilter);
+    $('date').addEventListener('change', () => {
+      if ($('date').value) document.querySelectorAll('[data-preset]').forEach(x => x.classList.remove('active'));
+      doFilter();
+    });
+    ['hideBad','favorites','visited','radius','sort'].forEach(id => $(id).addEventListener('change', doFilter));
+    $('locate').addEventListener('click', () => {
+      if (!navigator.geolocation) { $('locationState').textContent = 'Standort wird von diesem Browser nicht unterstützt.'; return; }
+      $('locationState').textContent = 'Standort wird ermittelt …';
+      navigator.geolocation.getCurrentPosition(position => {
+        S.loc = [position.coords.latitude, position.coords.longitude];
+        $('radius').disabled = false;
+        $('locationState').textContent = 'Standort aktiv';
+        if (S.map) S.map.setView(S.loc, 10, { animate: false });
+        doFilter();
+      }, () => { $('locationState').textContent = 'Standort nicht freigegeben.'; }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+    });
+    $('historyBtn').addEventListener('click', showHistory);
+    $('closeDrawer').addEventListener('click', () => closeDrawer('drawer','backdrop'));
+    $('backdrop').addEventListener('click', () => closeDrawer('drawer','backdrop'));
+    $('closeHistory').addEventListener('click', () => closeDrawer('history','historyBackdrop'));
+    $('historyBackdrop').addEventListener('click', () => closeDrawer('history','historyBackdrop'));
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    const type = response.headers.get('content-type') || '';
+    if (!type.includes('json')) throw new Error(`${url}: keine JSON-Antwort`);
+    return response.json();
+  }
+
+  async function load() {
+    $('status').textContent = 'Lade aktuelle Termine …';
+    const [apiResult, seedResult] = await Promise.allSettled([fetchJson(`/api/events?v=5&t=${Date.now()}`), fetchJson('/data/seed-events.json?v=5')]);
+    const raw = [];
+    let liveCount = 0;
+    let seedCount = 0;
+    if (apiResult.status === 'fulfilled' && Array.isArray(apiResult.value.events)) { raw.push(...apiResult.value.events); liveCount = apiResult.value.events.length; }
+    if (seedResult.status === 'fulfilled' && Array.isArray(seedResult.value.events)) { raw.push(...seedResult.value.events); seedCount = seedResult.value.events.length; }
+    S.events = dedupe(raw.map(normalizeEvent));
+    if (!S.events.length) {
+      $('status').textContent = 'Keine Daten geladen – Cloudflare/API prüfen.';
+      $('events').innerHTML = '<div class="empty">Es konnten keine Termine geladen werden.</div>';
+      return;
+    }
+    $('status').textContent = `${S.events.length} Termine geladen · ${liveCount} live + ${seedCount} verifiziert · täglich aktualisiert`;
+    doFilter();
+  }
+
+  initMap();
+  setup();
+  load();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js?v=5').catch(() => {});
 })();
