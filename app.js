@@ -68,7 +68,9 @@
   }
 
   function normalizeEvent(e,i) {
-    const lat=Number(e.lat), lon=Number(e.lon);
+    const latRaw=e.lat, lonRaw=e.lon;
+    const lat=(latRaw==null||latRaw==='')?null:Number(latRaw);
+    const lon=(lonRaw==null||lonRaw==='')?null:Number(lonRaw);
     return {
       ...e,
       id:String(e.id || `event-${i}`),
@@ -76,7 +78,8 @@
       address:String(e.address || ''), zip:String(e.zip || ''), place:String(e.place || ''),
       from:String(e.from || ''), to:String(e.to || ''), timeText:String(e.timeText || ''), notes:String(e.notes || ''),
       sourceLabel:String(e.sourceLabel || 'Quelle'), url:String(e.url || ''), groupId:String(e.groupId || ''),
-      lat:Number.isFinite(lat)?lat:null, lon:Number.isFinite(lon)?lon:null
+      lat:Number.isFinite(lat)&&lat>=47&&lat<=56?lat:null,
+      lon:Number.isFinite(lon)&&lon>=5&&lon<=16?lon:null
     };
   }
 
@@ -104,7 +107,7 @@
     if (seedResult.status==='fulfilled') combined.push(...(seedResult.value.events||[]));
     if (apiResult.status==='fulfilled') combined.push(...(apiResult.value.events||[]));
     S.events=dedupe(combined.map(normalizeEvent));
-    $('status').textContent = S.events.length ? `${S.events.length} Termine geladen` : 'Keine Termindaten geladen';
+    $('status').textContent = S.events.length ? `${S.events.length} Termine geladen · v8` : 'Keine Termindaten geladen · v8';
     doFilter();
   }
 
